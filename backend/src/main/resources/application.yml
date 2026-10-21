@@ -1,0 +1,18 @@
+spring:
+    application:
+        name: qly-kho
+    profiles:
+        include:
+            - postgre
+            - redis
+            - security
+            - cloudinary
+            - mail
+
+server:
+    servlet:
+        context-path: /api
+    port: ${SPRING_PORT}
+
+logging:
+  config: config/logback.xml

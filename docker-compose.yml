@@ -1,0 +1,95 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: qly_kho_postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    networks:
+      - warehouse_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: qly_kho_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    networks:
+      - warehouse_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  dbeaver:
+    image: dbeaver/cloudbeaver:latest
+    container_name: qly_kho_dbeaver
+    restart: always
+    ports:
+      - "8081:8978"
+    volumes:
+      - dbeaver_data:/opt/cloudbeaver/workspace
+    networks:
+      - warehouse_network
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: qly_kho_redisinsight
+    restart: always
+    ports:
+      - "8001:5540"
+    volumes:
+      - redisinsight_data:/data
+    networks:
+      - warehouse_network
+
+  python-tools:
+    build: ./scripts
+    container_name: qly_kho_python_scripts_runner
+    volumes:
+      - ./scripts:/app
+    working_dir: /app
+    networks:
+      - warehouse_network
+    tty: true
+    stdin_open: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: ${POSTGRES_HOST}
+      DB_PORT: ${POSTGRES_PORT}
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD} 
+
+networks:
+  warehouse_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  dbeaver_data:
+  redisinsight_data:
